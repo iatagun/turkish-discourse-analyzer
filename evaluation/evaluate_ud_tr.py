@@ -20,7 +20,7 @@ torch.load = _load
 
 
 UD_URL = "https://github.com/UniversalDependencies/UD_Turkish-IMST/archive/refs/heads/master.zip"
-DATA_DIR = Path("data/ud_tr_imst")
+DATA_DIR = Path("../data/ud_tr_imst")
 TEST_FILE = DATA_DIR / "UD_Turkish-IMST-master" / "tr_imst-ud-test.conllu"
 
 

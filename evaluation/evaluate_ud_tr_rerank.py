@@ -1,16 +1,15 @@
 import zipfile
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import List, Optional, Tuple
 import importlib.util
 import sysconfig
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import requests
 import torch
 import stanza
 import spacy_udpipe
-
 
 # Work around PyTorch 2.6+ defaulting to weights_only=True in torch.load
 _orig_load = torch.load
@@ -24,7 +23,7 @@ torch.load = _load
 
 
 UD_URL = "https://github.com/UniversalDependencies/UD_Turkish-IMST/archive/refs/heads/master.zip"
-DATA_DIR = Path("data/ud_tr_imst")
+DATA_DIR = Path("../data/ud_tr_imst")
 TEST_FILE = DATA_DIR / "UD_Turkish-IMST-master" / "tr_imst-ud-test.conllu"
 
 
@@ -83,6 +82,8 @@ def download_ud_treebank():
         zip_path.write_bytes(resp.content)
     with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(DATA_DIR)
+
+
 
 
 def iter_conllu_sentences(path: Path):
@@ -209,7 +210,6 @@ def resolve_pronouns(tokens: List[Token], prev_state: Optional[CenteringState]) 
 
 
 def compute_forward_centers(tokens: List[Token], pronoun_resolutions: Optional[dict] = None) -> List[str]:
-    """Söylemsel merkezleri POS bilgisiyle çıkar"""
     if pronoun_resolutions is None:
         pronoun_resolutions = {}
     
@@ -246,13 +246,11 @@ def compute_forward_centers(tokens: List[Token], pronoun_resolutions: Optional[d
             centers.append((referent, salience, i))
             continue
         
-        # POS etiketi üzerinden merkez adaylığını kontrol et
         if tok.upos not in {"NOUN", "PROPN", "PRON"}:
             continue
         salience = 0.0
         if tok.deprel in salience_weights:
             salience += salience_weights[tok.deprel]
-        # POS'a göre ağırlık - burada POS'un doğru olması önemli
         if tok.upos in pos_weights:
             salience += pos_weights[tok.upos]
         position_weight = 1.0 - (i / max(1, len(tokens)))
@@ -316,22 +314,19 @@ def transition_score(transition: Optional[TransitionType]) -> int:
 
 
 def score_parse(tokens: List[Token], prev_state: Optional[CenteringState]) -> Tuple[int, CenteringState]:
-    """POS etiketleriyle oluşturulan merkezleme skorunu hesapla"""
     pronoun_resolutions = resolve_pronouns(tokens, prev_state)
     cf = compute_forward_centers(tokens, pronoun_resolutions)
     transition, state = compute_transition(prev_state, cf, pronoun_resolutions)
     return transition_score(transition), state
 
 
-def pos_accuracy(gold: List[Token], pred: List[Token]) -> Tuple[int, int]:
-    """POS doğruluk hesapla"""
-    total = 0
-    correct = 0
+def update_scores(gold: List[Token], pred: List[Token], counts: dict) -> None:
     for g, p in zip(gold, pred):
-        total += 1
-        if p.upos == g.upos:
-            correct += 1
-    return correct, total
+        counts["total"] += 1
+        if p.head == g.head:
+            counts["uas"] += 1
+            if p.deprel == g.deprel:
+                counts["las"] += 1
 
 
 def main():
@@ -345,9 +340,9 @@ def main():
     spacy_udpipe.download("tr")
     udpipe_nlp = spacy_udpipe.load("tr")
 
-    counts_stanza = {"correct": 0, "total": 0}
-    counts_udpipe = {"correct": 0, "total": 0}
-    counts_rerank = {"correct": 0, "total": 0}
+    counts_stanza = {"total": 0, "uas": 0, "las": 0}
+    counts_trankit = {"total": 0, "uas": 0, "las": 0}
+    counts_rerank = {"total": 0, "uas": 0, "las": 0}
 
     prev_state: Optional[CenteringState] = None
 
@@ -358,53 +353,44 @@ def main():
 
         text = " ".join(tok.form for tok in gold)
         pred_stanza = stanza_parse(stanza_nlp, text)
-        pred_udpipe = udpipe_parse(udpipe_nlp, text)
+        pred_trankit = udpipe_parse(udpipe_nlp, text)
 
-        if not pred_stanza or not pred_udpipe:
+        if not pred_stanza or not pred_trankit:
             continue
-        if len(pred_stanza) != len(gold) or len(pred_udpipe) != len(gold):
+        if len(pred_stanza) != len(gold) or len(pred_trankit) != len(gold):
             continue
 
-        # Her iki parser'ın POS doğruluğunu hesapla
-        c_s, t_s = pos_accuracy(gold, pred_stanza)
-        counts_stanza["correct"] += c_s
-        counts_stanza["total"] += t_s
+        update_scores(gold, pred_stanza, counts_stanza)
+        update_scores(gold, pred_trankit, counts_trankit)
 
-        c_u, t_u = pos_accuracy(gold, pred_udpipe)
-        counts_udpipe["correct"] += c_u
-        counts_udpipe["total"] += t_u
-
-        # Centering skorlarıyla sınayarak en iyi POS seçimini yap
         score_s, state_s = score_parse(pred_stanza, prev_state)
-        score_u, state_u = score_parse(pred_udpipe, prev_state)
+        score_t, state_t = score_parse(pred_trankit, prev_state)
 
-        # Daha yüksek centering skoru olan parse'ın POS etiketlerini seç
-        if score_u > score_s:
-            chosen = pred_udpipe
-            prev_state = state_u
+        if score_t > score_s:
+            chosen = pred_trankit
+            prev_state = state_t
         else:
             chosen = pred_stanza
             prev_state = state_s
 
-        c_r, t_r = pos_accuracy(gold, chosen)
-        counts_rerank["correct"] += c_r
-        counts_rerank["total"] += t_r
+        update_scores(gold, chosen, counts_rerank)
 
     def report(name: str, counts: dict) -> None:
         total = counts["total"]
         if total == 0:
             print(f"{name}: no tokens evaluated")
             return
-        acc = counts["correct"] / total * 100
+        uas = counts["uas"] / total * 100
+        las = counts["las"] / total * 100
         print(f"{name}")
         print(f"  Tokens evaluated: {total}")
-        print(f"  POS Accuracy: {acc:.2f}%")
+        print(f"  UAS: {uas:.2f}")
+        print(f"  LAS: {las:.2f}")
 
-    print("UD Turkish IMST (test) - POS Tagging with Centering-based Reranking")
-    print()
+    print("UD Turkish IMST (test)")
     report("Stanza", counts_stanza)
-    report("UDPipe", counts_udpipe)
-    report("Centering rerank (POS belirsizlik azaltma)", counts_rerank)
+    report("UDPipe", counts_trankit)
+    report("Centering rerank", counts_rerank)
 
 
 if __name__ == "__main__":
