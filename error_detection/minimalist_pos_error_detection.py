@@ -21,6 +21,26 @@ from typing import List, Dict, Optional, Tuple, Set, Any
 from dataclasses import dataclass
 from enum import Enum
 import re
+import sys
+from pathlib import Path
+
+# Propositional semantics için optional import
+try:
+    _src_path = Path(__file__).parent.parent / 'src'
+    if str(_src_path) not in sys.path:
+        sys.path.insert(0, str(_src_path))
+    
+    from propositional_semantics import (  # type: ignore
+        TurkishPropositionAnalyzer,
+        PredicateType,
+        PropositionType
+    )
+    PROPOSITIONAL_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    PROPOSITIONAL_AVAILABLE = False
+    TurkishPropositionAnalyzer = None  # type: ignore
+    PredicateType = None  # type: ignore
+    PropositionType = None  # type: ignore
 
 
 class POSErrorType(Enum):
@@ -270,13 +290,17 @@ class MinimalistPOSErrorDetector:
     
     # Lexicalized compounds: -mA formu UD'de yaygın olarak NOUN kabul edilir
     # Bu kelimeler kalıcı ad + baş isim oluşturur, preference üretilmemeli
+    # 
+    # TEORİK TEMEL: Leksikalizasyon → semantic bleaching
+    # "Yüzme havuzu" → "yüzme" artık olay değil, NESNE TİPİ
+    # "Yazma defteri" → "yazma" hala olay/aktivite → nominal domain preference
     LEXICALIZED_mA = [
-        'yüzme',   # yüzme havuzu/salonu/sporu
-        'koşma',   # koşma parkuru/sporu
-        'kayma',   # kayma taşı
-        'dolma',   # dolma biber (yemek)
-        'sarma',   # sarma (yemek)
-        'basma',   # basma kumaş
+        'yüzme',   # yüzme havuzu/salonu/sporu → NESNE sınıflandırması
+        'koşma',   # koşma parkuru/sporu → NESNE sınıflandırması
+        'kayma',   # kayma taşı → NESNE özelliği
+        'dolma',   # dolma biber (yemek) → YEMEK adı
+        'sarma',   # sarma (yemek) → YEMEK adı
+        'basma',   # basma kumaş → KUMAŞ türü
         'boyama',  # boyama işi (ama "boyama defteri" değil)
         'çizme',   # çizme ayakkabı (ama "çizme defteri" değil)
     ]
@@ -285,6 +309,14 @@ class MinimalistPOSErrorDetector:
         self.candidate_errors: List[Dict] = []
         self.confirmed_errors: List[Dict] = []
         
+        # Propositional semantics analyzer (optional)
+        self.prop_analyzer = None
+        if PROPOSITIONAL_AVAILABLE and TurkishPropositionAnalyzer is not None:
+            try:
+                self.prop_analyzer = TurkishPropositionAnalyzer()
+            except Exception:
+                pass  # Silently fail if initialization fails
+        
     # ========== AŞAMA 1: POS + Dependency Analizi ==========
     
     def detect_noun_verb_confusion(self, item: LexicalItem, context: List[LexicalItem]) -> Optional[Dict]:
@@ -292,6 +324,18 @@ class MinimalistPOSErrorDetector:
         NOUN ↔ VERB karışıklığı tespiti
         
         Hedef: -DIK, -mA, -Iş gibi nominal türetmeler
+        
+        TEORİK TEMEL (Önermesel Semantik):
+        -DIK eki → PARÇALI YÜKLEM marker'ı
+          • Parçalı yüklem: Zamanda bir noktaya oturur (event-bound)
+          • Özgüllük kazandırır: +specific, +existential, +definite
+          • Nominal domain'e çeker: Sentetik önerme bileşeni
+          • Örnek: "Ali'nin okuduğu kitap" (parçalı, özgül, varoluşsal)
+        
+        -mA/-mAk eki → Nominal infinitive
+          • VerbForm=Vnoun marker'ı
+          • Leksikalize olmamışsa nominal domain preference
+          • Örnek: "Yazma defteri" vs "Yüzme havuzu" (lexicalized)
         
         Örnek:
         - "okuduğum" → VERB olarak etiketlenmiş ama NOUN olmalı (gerundive)
@@ -308,13 +352,41 @@ class MinimalistPOSErrorDetector:
                     # Lexicalized compound - preference üretme
                     return None
             
+            # Base confidence
+            confidence = 0.9
+            semantic_note = ""
+            
+            # SEMANTIC VALIDATION: Propositional semantics ile doğrula
+            if self.prop_analyzer and PredicateType is not None:
+                try:
+                    # Try to extract FEATS string from features tuple
+                    feats_str = ""
+                    if item.features:
+                        # Features is a tuple of (key, value) pairs - convert to FEATS format
+                        feats_str = "|".join(f"{k}={v}" for k, v in item.features if v)
+                    
+                    if feats_str:
+                        predicate_type = self.prop_analyzer.analyze_predicate_type(feats_str)
+                        
+                        # -DIK eki ve parçalı yüklem → Güçlü nominal preference
+                        if '-DIK' in item.morphology and predicate_type.value == 'parçalı':
+                            confidence = 0.95  # Semantic validation strengthens confidence
+                            semantic_note = " [Semantically verified: partitive predicate → nominal domain]"
+                        
+                        # -mA eki ve bütüncül yüklem → Potansiyel lexicalized
+                        elif '-mA' in item.morphology and predicate_type.value == 'bütüncül':
+                            confidence = 0.85
+                            semantic_note = " [Holistic predicate: may be lexicalizing]"
+                except Exception:
+                    pass  # Semantic analysis başarısız olursa base confidence kullan
+            
             return {
                 'type': POSErrorType.NOUN_VERB_CONFUSION,
                 'item': item,
                 'expected_pos': 'NOUN',
                 'found_pos': 'VERB',
-                'reason': f'Nominal suffix detected: {[s for s in self.NOMINAL_SUFFIXES if s in item.morphology]}',
-                'confidence': 0.9  # Yüksek güven
+                'reason': f'Nominal suffix detected: {[s for s in self.NOMINAL_SUFFIXES if s in item.morphology]}{semantic_note}',
+                'confidence': confidence
             }
         
         # Fiil eki yok ama VERB olarak etiketlenmişse
@@ -802,7 +874,6 @@ def demo_minimalist_error_detection():
     ]
     
     # Doğru selection order: VERB → NOUN (Theme) → PROPN (Agent)
-    from minimalist_pos_error_detection import SelectionHistory
     correct_selection = SelectionHistory()
     correct_selection.add_selection(items3[2], 1, 0)  # okudu (VERB) önce
     correct_selection.add_selection(items3[1], 2, 0)  # kitabı (Theme)

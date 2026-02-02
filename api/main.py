@@ -1,15 +1,15 @@
 """
-Türkçe POS Tagging Hata Tespiti - Basit Python API
+Türkçe POS Tagging Tercih Tespiti - Basit Python API
 ==================================================
 
 Kullanım:
-    from api.main import detect_centering_errors, detect_minimalist_errors
+    from api.main import check_sentence, detect_minimalist_errors
+    
+    # Basit kontrol
+    result = check_sentence("Ali'nin okuduğu kitap burada.")
     
     # Minimalist analiz
     errors = detect_minimalist_errors(words)
-    
-    # Centering analiz
-    result = detect_centering_errors(sentences)
 """
 
 import sys
@@ -17,10 +17,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 # Parent directories'i path'e ekle
-sys.path.insert(0, str(Path(__file__).parent.parent / "core"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "error_detection"))
 
-from turkish_centering_theory import TurkishCenteringTheory, Entity, Utterance
 from minimalist_pos_error_detection import (
     MinimalistPOSErrorDetector,
     create_lexical_item
@@ -79,10 +77,18 @@ def is_finite_verb(feats: str) -> bool:
     """
     FEATS bilgisine bakarak finit fiil olup olmadığını kontrol et
     
-    Finit fiil özellikleri:
-    - Tense (zaman): Past, Pres, Fut
-    - Mood (kip): Ind, Imp, Opt
-    - Aspect (görünüş): Perf, Imp
+    TEORİK TEMEL (Önermesel Semantik - Yüklem Tipi):
+    
+    PARÇALI YÜKLEM (Finite - zamana gönderimli):
+    - Tense (zaman): Past, Pres, Fut → Zamanda bir noktaya oturur
+    - Mood (kip): Ind, Imp, Opt → Bildirim değeri var
+    - Aspect (görünüş): Perf, Imp, Prog → Olay tümcesi
+    - Örnek: "Kuşlar uçtu" (parçalı, sentetik önerme)
+    
+    BÜTÜNCÜL YÜKLEM (Non-finite - generic):
+    - VerbForm=Vnoun, VerbForm=Part → Nominal domain
+    - Tense=Aor (geniş zaman) → Özellik tümcesi
+    - Örnek: "Kuşlar uçar" (bütüncül, analitik önerme)
     
     NON-finite (nominal) özellikleri:
     - Case (durum eki): Nom, Acc, Dat, Loc, Abl, Gen
@@ -282,116 +288,6 @@ def detect_minimalist_errors(words: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def detect_centering_errors(sentences: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Merkezleme Kuramı ile söylem tutarlılığı analizi
-    
-    Args:
-        sentences: Cümle listesi
-            Her cümle: {
-                "text": str,
-                "words": [{"text": str, "pos": str, "dependency": str}]
-            }
-            
-    Returns:
-        {
-            "discourse_score": float,
-            "transitions": List[str],
-            "errors": List[Dict]
-        }
-    
-    Örnek:
-        >>> sentences = [
-        ...     {
-        ...         "text": "Ahmet geldi.",
-        ...         "words": [
-        ...             {"text": "Ahmet", "pos": "PROPN", "dependency": "nsubj"},
-        ...             {"text": "geldi", "pos": "VERB", "dependency": "root"}
-        ...         ]
-        ...     },
-        ...     {
-        ...         "text": "O yorgun.",
-        ...         "words": [
-        ...             {"text": "O", "pos": "PRON", "dependency": "nsubj"},
-        ...             {"text": "yorgun", "pos": "ADJ", "dependency": "root"}
-        ...         ]
-        ...     }
-        ... ]
-        >>> result = detect_centering_errors(sentences)
-        >>> print(result["discourse_score"])
-        4.0
-    """
-    ct = TurkishCenteringTheory()
-    errors = []
-    transitions = []
-    
-    # Dependency rollerini centering rollerine map et
-    dep_to_role = {
-        'nsubj': 'SUBJ',
-        'obj': 'OBJ',
-        'iobj': 'IOBJ',
-        'nmod': 'POSS',
-        'obl': 'COMP',
-        'amod': 'ADJ'
-    }
-    
-    # Her cümle için centering analizi
-    for i, sent in enumerate(sentences):
-        # Entities çıkar (PRON ve DET de dahil - Türkçe zamirleri için)
-        entities = []
-        for word in sent["words"]:
-            if word["pos"] in ["PROPN", "NOUN", "PRON", "DET"]:
-                dep = word.get("dependency", "other")
-                role = dep_to_role.get(dep, 'OTHER')
-                entities.append(Entity(word["text"], role))
-        
-        # Utterance oluştur ve analiz et
-        utterance = Utterance(sent["text"], entities)
-        transition, info = ct.analyze_utterance(utterance)
-        
-        if i > 0:
-            transitions.append(transition.value)
-            
-            # Transition skorlama (enum değerleriyle eşleşmeli)
-            transition_scores = {
-                'Continue': 4,
-                'Retain': 3,
-                'Smooth-Shift': 2,
-                'Rough-Shift': 1,
-                'Null': 2
-            }
-            
-            score = transition_scores.get(transition.value, 2)
-            
-            if score <= 2:
-                errors.append({
-                    "sentence_index": i,
-                    "transition": transition.value,
-                    "score": score,
-                    "severity": "high" if score == 1 else "medium"
-                })
-    
-    # Ortalama skor
-    if transitions:
-        transition_scores = {
-            'Continue': 4,
-            'Retain': 3,
-            'Smooth-Shift': 2,
-            'Rough-Shift': 1,
-            'Null': 2
-        }
-        total_score = sum(transition_scores.get(t, 2) for t in transitions)
-        avg_score = total_score / len(transitions)
-    else:
-        avg_score = 0.0
-    
-    return {
-        "discourse_score": avg_score,
-        "transitions": transitions,
-        "errors": errors
-    }
-
-
 def check_sentence(text: str) -> Dict[str, Any]:
     """
     TEK SATIRDA POS HATA TESPİTİ
@@ -438,68 +334,4 @@ def check_sentence(text: str) -> Dict[str, Any]:
         "words": words,
         "errors": result["errors"],
         "total_errors": result["total_errors"]
-    }
-
-
-def check_discourse(sentences: List[str]) -> Dict[str, Any]:
-    """
-    ÇOKLU CÜMLE SÖYLEM ANALİZİ
-    
-    Birden fazla cümleyi parse edip söylem tutarlılığını kontrol eder.
-    
-    Args:
-        sentences: Türkçe cümle listesi
-        
-    Returns:
-        {
-            "discourse_score": float,
-            "transitions": List[str],
-            "sentence_errors": [...]
-        }
-        
-    Örnek:
-        >>> from api.main import check_discourse
-        >>> result = check_discourse(["Ahmet geldi.", "O yorgun."])
-        >>> print(f"Söylem skoru: {result['discourse_score']}/4")
-        Söylem skoru: 4.0/4
-    """
-    nlp = _get_stanza_pipeline()
-    
-    # Her cümleyi parse et
-    parsed_sentences = []
-    for text in sentences:
-        doc = nlp(text)
-        words = []
-        for sent in doc.sentences:
-            for word in sent.words:
-                words.append({
-                    "text": word.text,
-                    "pos": word.upos,
-                    "lemma": word.lemma,
-                    "dependency": word.deprel,
-                    "feats": word.feats if word.feats else ""  # FEATS eklendi!
-                })
-        parsed_sentences.append({
-            "text": text,
-            "words": words
-        })
-    
-    # Centering analizi
-    centering = detect_centering_errors(parsed_sentences)
-    
-    # Her cümlenin minimalist hataları
-    sentence_errors = []
-    for sent in parsed_sentences:
-        min_result = detect_minimalist_errors(sent["words"])
-        sentence_errors.append({
-            "sentence": sent["text"],
-            "errors": min_result["errors"],
-            "total_errors": min_result["total_errors"]
-        })
-    
-    return {
-        "discourse_score": centering["discourse_score"],
-        "transitions": centering["transitions"],
-        "centering_errors": centering["errors"],
-        "sentence_errors": sentence_errors
     }
