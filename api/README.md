@@ -30,7 +30,7 @@ Ek bağımlılık yok. Ana proje bağımlılıkları yeterli.
 
 ## Kullanım
 
-### 1. Minimalist Program ile Hata Tespiti
+### 1. Minimalist Program ile Nominal Domain Preference Tespiti
 
 ```python
 from api.main import detect_minimalist_errors
@@ -44,15 +44,15 @@ words = [
 # Analiz et
 result = detect_minimalist_errors(words)
 
-print(f"Toplam hata: {result['total_errors']}")
+print(f"Toplam preference: {result['total_errors']}")
 for error in result['errors']:
     print(f"- {error['word']}: {error['reason']} (güven: {error['confidence']})")
 ```
 
 **Çıktı:**
 ```
-Toplam hata: 1
-- okuduğu: Nominal suffix '-DIK' detected, should be NOUN (güven: 0.9)
+Toplam preference: 1
+- okuduğu: Nominal domain preference (VERB-origin) (güven: 0.9)
 ```
 
 ### 2. Merkezleme Kuramı ile Söylem Analizi
@@ -85,14 +85,14 @@ result = detect_centering_errors(sentences)
 
 print(f"Söylem skoru: {result['discourse_score']}")
 print(f"Geçişler: {result['transitions']}")
-print(f"Hatalar: {len(result['errors'])}")
+print(f"Discourse issues: {len(result['errors'])}")
 ```
 
 **Çıktı:**
 ```
 Söylem skoru: 4.0
 Geçişler: ['CONTINUE']
-Hatalar: 0
+Discourse issues: 0
 ```
 
 ### 3. Komple Örnek (Her İki Yaklaşım)
@@ -126,7 +126,7 @@ print("=== MİNİMALİST PROGRAM ===")
 for sent in test_data:
     result = detect_minimalist_errors(sent["words"])
     print(f"\nCümle: {sent['text']}")
-    print(f"Hatalar: {result['total_errors']}")
+    print(f"Preferences: {result['total_errors']}")
     for err in result['errors']:
         print(f"  - {err['word']}: {err['type']} ({err['confidence']})")
 
@@ -141,30 +141,40 @@ print(f"Geçişler: {centering_result['transitions']}")
 
 ### `detect_minimalist_errors(words)`
 
+Nominal domain preferences tespit eder. Fonksiyon adı "errors" içerse de, bunlar **UD hataları DEĞİL**, discourse görevleri için task-driven önerilerdir.
+
 **Parametreler:**
 - `words` (List[Dict]): Kelime listesi
   - `text` (str): Kelime metni
   - `pos` (str): POS etiketi (NOUN, VERB, ADJ, vb.)
   - `morphology` (List[str], opsiyonel): Morfolojik özellikler
+  - `feats` (str, opsiyonel): FEATS bilgisi (finit fiil kontrolü için)
 
 **Dönüş:**
 ```python
 {
-    "total_errors": int,
-    "errors": [
+    "total_errors": int,  # NOT: "errors" = preference sayısı (backward compatibility)
+    "errors": [  # Her bir preference
         {
             "word": str,
-            "type": str,  # NOUN_VERB_CONFUSION, ADJ_NOUN_CONFUSION, vb.
-            "found_pos": str,
-            "expected_pos": str,
+            "type": str,  # "Nominal domain preference (VERB-origin)" vb.
+            "found_pos": str,  # UD'nin verdiği etiket (doğru)
+            "expected_pos": str,  # Discourse görevleri için öneri
             "reason": str,
-            "confidence": float  # 0.0-1.0
+            "confidence": float  # 0.0-1.0 (>0.85: strong, <0.85: weak)
         }
     ]
 }
 ```
 
+**Lexicalized Compound İstisnalar:**
+- `-mA` eki için: "yüzme", "koşma", "kayma", "dolma", "sarma" gibi kalıcılaşmış bileşikler preference üretmez
+- Örnek: "Yüzme havuzu" → preference YOK, "Yazma defteri" → preference VAR
+```
+
 ### `detect_centering_errors(sentences)`
+
+Merkezleme Kuramı (Centering Theory) ile söylem tutarlılığı analizi. **Backward Center (Cb)** hesabı **tam Cf-based** yöntemle yapılır (Grosz, Joshi & Weinstein 1995).
 
 **Parametreler:**
 - `sentences` (List[Dict]): Cümle listesi
@@ -172,25 +182,48 @@ print(f"Geçişler: {centering_result['transitions']}")
   - `words` (List[Dict]): Kelime listesi
     - `text` (str): Kelime
     - `pos` (str): POS etiketi
-    - `dependency` (str): Bağımlılık rolü
+    - `dependency` (str): Bağımlılık rolü (nsubj, obj, vb.)
 
 **Dönüş:**
 ```python
 {
-    "discourse_score": float,  # Yüksek = tutarlı
-    "transitions": List[str],  # CONTINUE, RETAIN, vb.
-    "errors": [
+    "discourse_score": float,  # 0.0-4.0 (yüksek = tutarlı söylem)
+    "transitions": List[str],  # ['Continue', 'Retain', 'Smooth-Shift', 'Rough-Shift']
+    "errors": [  # Söylem tutarsızlıkları (UD hataları DEĞİL)
         {
             "sentence_index": int,
             "transition": str,
             "score": int,
-            "severity": str  # high, medium, low
+            "severity": str  # high (Rough-Shift), medium, low
         }
     ]
 }
 ```
 
+**Centering İyileştirmeleri:**
+- ✅ Zamir çözümleme: "O" → önceki Cp'ye resolve edilir
+- ✅ Örtük özne (pro-drop) desteği
+- ✅ DET→PRON discourse-driven relabeling (aşağıya bakın)
+- ✅ Tam Cf-based Cb: Tüm Cf(U_n-1) listesi öncelik sırasına göre taranır
+```
+
 ## Discourse-Driven Relabeling (DET ↔ PRON)
+
+### Centering Theory İyileştirmesi: Tam Cf-based Cb Computation
+
+**Akademik tanım (Grosz, Joshi & Weinstein 1995):**
+> Cb(U_n) = en yüksek öncelikli Cf(U_n-1) elemanı ki Cf(U_n)'de realize olmuş
+
+**Önceki basitleştirilmiş yöntem (HATALI):**
+- Sadece `Cp(U_n-1)` kontrol ediliyordu
+- Eğer Cp şu anki cümlede varsa → Cb
+
+**Yeni tam yöntem (DOĞRU):**
+- Tüm `Cf(U_n-1)` listesi en yüksek öncelikten en düşüğe doğru taranır
+- İlk realize olmuş (şu anki cümlede bulunan) entity → Cb
+- Örtük özne (pro-drop) durumu da kontrol edilir
+
+Bu iyileştirme, söylem geçişlerinin (Continue, Retain, Shift) daha doğru hesaplanmasını sağlar.
 
 ### Neden "O" Bazı Durumlarda DET, Bazılarında PRON?
 
