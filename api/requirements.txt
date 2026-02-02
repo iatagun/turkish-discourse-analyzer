@@ -1,0 +1,2 @@
+# API için ek bağımlılık yok
+# Core modüller zaten mevcut

@@ -299,7 +299,11 @@ class MinimalistPOSErrorDetector:
         
         # Fiil eki yok ama VERB olarak etiketlenmişse
         has_verb_features = any(feat in item.morphology for feat in ['PAST', 'PRES', 'FUT', 'AOR'])
-        if item.pos == 'VERB' and not has_verb_features and not has_nominal_suffix:
+        
+        # FINITE_VERB feature varsa, bu normal finit fiil demektir
+        is_finite = any(k == 'FINITE_VERB' for k, v in item.features if v)
+        
+        if item.pos == 'VERB' and not has_verb_features and not has_nominal_suffix and not is_finite:
             return {
                 'type': POSErrorType.NOUN_VERB_CONFUSION,
                 'item': item,

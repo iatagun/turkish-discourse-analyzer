@@ -91,6 +91,8 @@ class TurkishCenteringTheory:
         """
         Backward-looking center'ı hesaplar.
         Cb(U_n) = Cp(U_n-1) eğer Cp(U_n-1) ∈ Cf(U_n)
+        
+        Not: Zamir çözümleme analyze_utterance()'da yapılır
         """
         if previous_utterance is None:
             return None
@@ -98,13 +100,17 @@ class TurkishCenteringTheory:
         if previous_utterance.cp is None:
             return None
             
-        # Cp(U_n-1) şu anki utterance'da gerçekleşiyor mu?
+        # Cp(U_n-1) şu anki utterance'da var mı? (zamirler zaten resolve edilmiş)
         current_entities_text = [e.text for e in current_utterance.entities]
         if previous_utterance.cp.text in current_entities_text:
-            # Aynı metne sahip entity'yi bul
             for entity in current_utterance.entities:
                 if entity.text == previous_utterance.cp.text:
                     return entity
+        
+        # Örtük özne (pro-drop): Özne yoksa ama önceki Cp özne ise
+        has_subject = any(e.grammatical_role == 'SUBJ' for e in current_utterance.entities)
+        if not has_subject and previous_utterance.cp.grammatical_role == 'SUBJ':
+            return Entity(previous_utterance.cp.text, 'SUBJ', previous_utterance.cp.case_marker)
         
         return None
     
@@ -127,16 +133,35 @@ class TurkishCenteringTheory:
         - RETAIN: Cb(U_n) = Cb(U_n-1) ≠ Cp(U_n)
         - SMOOTH-SHIFT: Cb(U_n) ≠ Cb(U_n-1), Cb(U_n) = Cp(U_n)
         - ROUGH-SHIFT: Cb(U_n) ≠ Cb(U_n-1), Cb(U_n) ≠ Cp(U_n)
+        - NULL: Hiç entity yoksa veya ilk utterance
         """
-        if current_utterance.cb is None:
+        # Hiç entity yoksa NULL
+        if not current_utterance.entities:
             return TransitionType.NULL
             
-        if previous_utterance is None or previous_utterance.cb is None:
+        # İlk utterance ise
+        if previous_utterance is None:
             if current_utterance.cb == current_utterance.cp:
                 return TransitionType.SMOOTH_SHIFT
             else:
                 return TransitionType.ROUGH_SHIFT
         
+        # Cb = None ama önceki utterance var → Konu değişti
+        if current_utterance.cb is None:
+            # Önceki Cp varsa (bir konu vardı) ama şimdi Cb yok → ROUGH-SHIFT
+            if previous_utterance.cp is not None:
+                return TransitionType.ROUGH_SHIFT
+            # Her iki tarafta da Cp/Cb yok → NULL
+            return TransitionType.NULL
+        
+        # Önceki Cb yoksa
+        if previous_utterance.cb is None:
+            if current_utterance.cb == current_utterance.cp:
+                return TransitionType.SMOOTH_SHIFT
+            else:
+                return TransitionType.ROUGH_SHIFT
+        
+        # Normal Centering kuralları
         cb_same = current_utterance.cb == previous_utterance.cb
         cb_cp_same = current_utterance.cb == current_utterance.cp
         
@@ -157,6 +182,22 @@ class TurkishCenteringTheory:
             (TransitionType, centering_info dict)
         """
         previous_utterance = self.discourse[-1] if self.discourse else None
+        
+        # Türkçe zamirleri
+        turkish_pronouns = {'o', 'bu', 'şu', 'bunu', 'şunu', 'onu', 'bunun', 'şunun', 'onun'}
+        
+        # Zamirleri önceki Cp ile değiştir (resolve et)
+        if previous_utterance and previous_utterance.cp:
+            resolved_entities = []
+            for entity in utterance.entities:
+                if entity.text.lower() in turkish_pronouns:
+                    # Zamiri önceki Cp ile değiştir
+                    # ÖNEMLI: Zamir genelde özne olduğu için önceki Cp'nin role'ünü kullan
+                    new_role = entity.grammatical_role if entity.grammatical_role in ['SUBJ', 'OBJ'] else previous_utterance.cp.grammatical_role
+                    resolved_entities.append(Entity(previous_utterance.cp.text, new_role, entity.case_marker))
+                else:
+                    resolved_entities.append(entity)
+            utterance.entities = resolved_entities
         
         # Cf listesini hesapla
         utterance.cf_list = self.compute_cf_list(utterance)
