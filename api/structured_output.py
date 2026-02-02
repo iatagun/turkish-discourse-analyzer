@@ -114,7 +114,7 @@ def analyze_propositional_semantics(text: str, words: List[Dict[str, Any]]) -> O
     Returns:
         {
             "proposition_type": "analytic" | "synthetic",
-            "predicate_type": "bütüncül" | "parçalı" | "alışkanlık",
+            "predicate_type": "holistic" | "partitive" | "habitual",
             "generic_encoding": bool,
             "time_bound": bool,
             "verifiability": float,
@@ -156,7 +156,7 @@ def analyze_propositional_semantics(text: str, words: List[Dict[str, Any]]) -> O
             
             return {
                 "proposition_type": "synthetic",
-                "predicate_type": "bütüncül",  # Copula = state = holistic
+                "predicate_type": "holistic",  # Copula = state = holistic
                 "generic_encoding": False,
                 "time_bound": False,
                 "verifiability": 0.7,
@@ -166,15 +166,22 @@ def analyze_propositional_semantics(text: str, words: List[Dict[str, Any]]) -> O
         analysis = analyses[0]
         prop_value = analysis.get('propositional_value', {})
         
-        # sentence_type'tan predicate_type'ı düzelt
+        # sentence_type'tan predicate_type'ı düzelt ve İngilizce'ye çevir
         sentence_type = prop_value.get("sentence_type", "")
         predicate_type_raw = prop_value.get("predicate_type", "bütüncül")
         
-        # alışkanlık → "alışkanlık" (ileride kullanılacak)
+        # Türkçe → İngilizce çeviri
+        predicate_type_map = {
+            "bütüncül": "holistic",
+            "parçalı": "partitive",
+            "alışkanlık": "habitual"
+        }
+        
+        # sentence_type öncelikli (alışkanlık tespiti için)
         if sentence_type == "alışkanlık":
-            predicate_type = "alışkanlık"
+            predicate_type = "habitual"
         else:
-            predicate_type = predicate_type_raw
+            predicate_type = predicate_type_map.get(predicate_type_raw, predicate_type_raw)
         
         return {
             "proposition_type": prop_value.get("type"),
@@ -188,7 +195,7 @@ def analyze_propositional_semantics(text: str, words: List[Dict[str, Any]]) -> O
         # Hata durumunda basit default değer
         return {
             "proposition_type": "synthetic",
-            "predicate_type": "bütüncül",
+            "predicate_type": "holistic",
             "generic_encoding": False,
             "time_bound": False,
             "verifiability": 0.5,
