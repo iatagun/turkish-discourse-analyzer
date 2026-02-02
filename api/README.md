@@ -1,8 +1,23 @@
 # Türkçe POS Tagging Hata Tespiti - Python API
 
 Basit Python fonksiyonları ile iki farklı dilbilimsel yaklaşım:
-1. **Minimalist Program** - Nominal türetmeler, adlaşmış sıfatlar
-2. **Merkezleme Kuramı** - Söylem tutarlılığı
+1. **Minimalist Program** - Nominal domain preferences (adlaşma eğilimleri)
+2. **Merkezleme Kuramı** - Söylem tutarlılığı (discourse coherence)
+
+## Önemli Not: UD vs. Görev-Odaklı Etiketleme
+
+Bu proje **UD (Universal Dependencies) etiketlerini "hata" olarak değil**, 
+**discourse/semantic görevler için yetersiz kalabileceği durumları** tespit eder.
+
+- UD'de `-DIK`, `-mA`, `-mAk` gibi türetimler sıklıkla VERB/ADJ olarak kalır (VerbForm=Part/Vnoun)
+- Bu UD açısından **doğrudur** ve standarda uygundur
+- Ancak **coreference, centering, semantic role** gibi görevlerde nominal davranış gösterebilirler
+- Proje bu tür "**nominal domain preference**" durumlarını tespit eder
+
+**Terminoloji:**
+- ❌ "Stanza hatası" DEMİYORUZ
+- ✅ "Nominal domain shift / preference" DİYORUZ
+- ✅ "Task-driven relabeling suggestion" DİYORUZ
 
 ## Kurulum
 
@@ -169,3 +184,87 @@ print(f"Geçişler: {centering_result['transitions']}")
     ]
 }
 ```
+
+## Discourse-Driven Relabeling (DET ↔ PRON)
+
+### Neden "O" Bazı Durumlarda DET, Bazılarında PRON?
+
+**UD perspektifi:**
+- "O kitap" → `O[DET] kitap[NOUN]` (determiner/işaret sıfatı)
+- "O geldi" → `O[PRON] geldi[VERB]` (zamir/özne)
+
+**Bu UD açısından DOĞRU!** Ancak **discourse görevleri** (coreference, centering) için yetersiz:
+
+```python
+# Örnek discourse:
+Cümle 1: "Ahmet markete gitti."
+Cümle 2: "O süt aldı."  # UD: O[DET] süt[NOUN]
+```
+
+**Sorun:** UD'de "O" DET etiketlenmiş, ama **discourse-level anlamda Ahmet'e refer ediyor**.
+
+**Proje çözümü:**
+1. Centering Theory'nin **backward center (Cb)** hesabı için "O"yu `PRON` olarak treat et
+2. Önceki cümledeki `Cp(U_n-1)`'i bul (örn: "Ahmet")
+3. "O"yu resolve et: `O → Ahmet`
+
+### Kod Örnekleri
+
+**DET→PRON Relabeling (Discourse Context):**
+```python
+# Cümle 2'de "O" UD'de DET ama discourse'da PRON:
+{
+    "text": "O süt aldı.",
+    "words": [
+        {"text": "O", "pos": "DET"},  # UD etiketlenmesi
+        {"text": "süt", "pos": "NOUN"},
+        {"text": "aldı", "pos": "VERB"}
+    ]
+}
+
+# Centering Theory analizi:
+# 1. Önceki Cp = "Ahmet"
+# 2. "O" discourse'da Ahmet'e refer ediyor
+# 3. İşleme sırasında: O → PRON (discourse role) ve resolve et → "Ahmet"
+```
+
+**PRON Handling (Zaten Doğru):**
+```python
+# Cümle'de "O" zaten özne:
+{
+    "text": "O geldi.",
+    "words": [
+        {"text": "O", "pos": "PRON"}  # UD doğru
+    ]
+}
+# Bu durumda relabeling gerekmez, direkt resolve edilir
+```
+
+### Akademik Çerçeveleme
+
+**NOT:** Bu projede **DET→PRON relabeling**, UD'nin "hatalı" olduğu anlamına GELMİYOR!
+
+- **UD doğru:** "O kitap" yapısında "O" gerçekten determiner
+- **Discourse doğru:** Aynı "O", discourse-level'da önceki entity'ye refer ediyor
+
+**İki seviyeli analiz:**
+1. **Syntactic (UD):** "O" = DET (işaret sıfatı)
+2. **Discourse (Centering):** "O" = anaphoric reference → PRON muamelesi
+
+Proje, **discourse görevleri için** syntax-level etiketleri **temporarily remap** ediyor.
+Bu, UD'ye **alternatif** değil, **complementary** bir yaklaşımdır.
+
+### Hangi Durumlarda Relabeling Yapılır?
+
+**Trigger koşulları:**
+1. Token "O", "bu", "şu" gibi demonstrative
+2. UD etiketi `DET`
+3. **Discourse context mevcut** (önceki cümle var)
+4. Önceki `Cp` ile semantik bağlantı olası
+
+**Relabeling YAPILMAZ:**
+- Discourse yoksa (ilk cümle)
+- "O" özne pozisyonunda değilse ve önceki Cp ile match etmiyorsa
+- Önceki Cp yoksa veya resolve edilemiyorsa
+
+

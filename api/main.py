@@ -130,35 +130,40 @@ def format_error_type_academic(error_type: str, found_pos: str, expected_pos: st
     """
     Hata tipini akademik formata çevir
     
+    NOT: "Hata" terimi UD açısından yanlıştır. Bu tespitler:
+    - UD standardına uygun etiketlerin discourse/semantic görevler için yetersiz kalması
+    - Nominal domain preference (adlaşma eğilimi) göstergeleri
+    - Task-driven relabeling önerileri
+    
     Args:
         error_type: POSErrorType enum değeri (ör: "NOUN ↔ VERB")
-        found_pos: Bulunan POS etiketi
-        expected_pos: Beklenen POS etiketi
+        found_pos: Bulunan UD etiketi
+        expected_pos: Görev için önerilen etiket
         
     Returns:
-        Akademik format (ör: "Nominal domain shift (VERB-origin)")
+        Akademik format (ör: "Nominal domain preference (VERB-origin)")
     """
-    # NOUN ↔ VERB hatası
+    # NOUN ↔ VERB: Nominal domain preference
     if "NOUN" in error_type and "VERB" in error_type:
         if found_pos == "VERB" and expected_pos == "NOUN":
-            return "Nominal domain shift (VERB-origin)"
+            return "Nominal domain preference (VERB-origin)"
         elif found_pos == "NOUN" and expected_pos == "VERB":
-            return "Verbal domain shift (NOUN-origin)"
+            return "Verbal domain preference (NOUN-origin)"
     
-    # ADJ ↔ NOUN hatası
+    # ADJ ↔ NOUN: Nominal domain preference
     elif "ADJ" in error_type and "NOUN" in error_type:
         if found_pos == "ADJ" and expected_pos == "NOUN":
-            return "Nominal domain shift (ADJ-origin)"
+            return "Nominal domain preference (ADJ-origin)"
         elif found_pos == "NOUN" and expected_pos == "ADJ":
-            return "Adjectival domain shift (NOUN-origin)"
+            return "Adjectival domain preference (NOUN-origin)"
     
-    # PRON ↔ DET hatası
+    # PRON ↔ DET: Discourse-driven relabeling
     elif "PRON" in error_type and "DET" in error_type:
-        return "Determiner-pronoun mismatch"
+        return "Discourse-driven relabeling (DET→PRON for coreference)"
     
-    # SUBJ ↔ OBJ hatası
+    # SUBJ ↔ OBJ: Argument structure
     elif "SUBJ" in error_type and "OBJ" in error_type:
-        return "Argument structure violation"
+        return "Argument structure inconsistency"
     
     # Diğerleri için orijinal format
     return error_type

@@ -5,40 +5,41 @@ Kapsamlı Test - Tüm Hata Tipleri
 from main import check_sentence, check_discourse
 
 print("=" * 70)
-print("TÜRKÇE POS TAGGING HATA TESPİTİ - KAPSAMLI TEST")
+print("TÜRKÇE POS TAGGING - NOMINAL DOMAIN PREFERENCE TESPİTİ")
+print("(UD etiketleri doğrudur; discourse görevleri için öneriler)")
 print("=" * 70)
 
 # Test kategorileri
 test_cases = {
-    "1. Nominal Domain Shift (VERB-origin) - -DIK eki": [
-        "Ali'nin okuduğu kitap",
-        "Benim geldiğim yer",
-        "Senin yaptığın iş"
+    "1. Nominal Domain Preference (VERB-origin) - -DIK eki": [
+        "Ali'nin okuduğu kitap.",
+        "Benim geldiğim yer.",
+        "Senin yaptığın iş."
     ],
-    "2. Nominal Domain Shift (VERB-origin) - -mA eki": [
-        "Yazma defteri aldım",
-        "Yüzme havuzu",
-        "Okuma kitabı"
+    "2. Nominal Domain Preference (VERB-origin) - -mA eki": [
+        "Yazma defteri aldım.",
+        "Yüzme havuzu.",
+        "Okuma kitabı."
     ],
-    "3. Nominal Domain Shift (VERB-origin) - -mAk eki": [
-        "Koşmak sağlıklıdır",
-        "Yemek yapmak zor",
-        "Uyumak önemli"
+    "3. Nominal Domain Preference (VERB-origin) - -mAk eki": [
+        "Koşmak sağlıklıdır.",
+        "Yemek yapmak zor.",
+        "Uyumak önemli."
     ],
-    "4. Nominal Domain Shift (VERB-origin) - -Iş eki": [
-        "Göçüş zamanı",
-        "Bakış açısı",
-        "Çıkış yolu"
+    "4. Nominal Domain Preference (VERB-origin) - -Iş eki": [
+        "Göçüş zamanı.",
+        "Bakış açısı.",
+        "Çıkış yolu."
     ],
-    "5. Nominal Domain Shift (ADJ-origin) - Adlaşmış sıfatlar": [
-        "Güzel insan",
-        "Yaşlı adam geldi",
-        "Küçük çocuk"
+    "5. Nominal Domain Preference (ADJ-origin) - Adlaşmış sıfatlar": [
+        "Güzel insan.",
+        "Yaşlı adam geldi.",
+        "Küçük çocuk."
     ],
-    "6. Doğru etiketlenmiş cümleler": [
-        "Ali kitap okudu",
-        "Çocuk parkta oynadı",
-        "Annem yemek yaptı"
+    "6. UD-uyumlu etiketler (nominal preference yok)": [
+        "Ali kitap okudu.",
+        "Çocuk parkta oynadı.",
+        "Annem yemek yaptı."
     ]
 }
 

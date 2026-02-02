@@ -89,28 +89,47 @@ class TurkishCenteringTheory:
     def compute_cb(self, current_utterance: Utterance, 
                    previous_utterance: Optional[Utterance]) -> Optional[Entity]:
         """
-        Backward-looking center'ı hesaplar.
-        Cb(U_n) = Cp(U_n-1) eğer Cp(U_n-1) ∈ Cf(U_n)
+        Backward-looking center'ı hesaplar - TAM TERCİH SIRASI YÖNTEMİ.
+        
+        Akademik tanım (Grosz, Joshi & Weinstein 1995):
+        Cb(U_n) = en yüksek öncelikli Cf(U_n-1) elemanı ki Cf(U_n)'de realize olmuş
+        
+        Algoritma:
+        1. Önceki cümlenin Cf listesini en yüksek öncelikten en düşüğe doğru tara
+        2. İlk realize olmuş (şu anki cümlede bulunan) entity'yi Cb yap
+        3. Örtük özne (pro-drop) durumunu da kontrol et
+        
+        Önceki yöntem (HATALI): Sadece Cp(U_n-1) kontrol ediliyordu
+        Yeni yöntem (DOĞRU): Tüm Cf(U_n-1) sıralı olarak taranıyor
         
         Not: Zamir çözümleme analyze_utterance()'da yapılır
         """
         if previous_utterance is None:
             return None
             
-        if previous_utterance.cp is None:
+        # Boş Cf listesi varsa Cb tanımsız
+        if not previous_utterance.entities:
             return None
             
-        # Cp(U_n-1) şu anki utterance'da var mı? (zamirler zaten resolve edilmiş)
+        # Şu anki cümledeki entity metinlerini topla (zamir çözümlemeleri dahil)
         current_entities_text = [e.text for e in current_utterance.entities]
-        if previous_utterance.cp.text in current_entities_text:
-            for entity in current_utterance.entities:
-                if entity.text == previous_utterance.cp.text:
-                    return entity
         
-        # Örtük özne (pro-drop): Özne yoksa ama önceki Cp özne ise
+        # Cf(U_n-1)'i öncelik sırasına göre tara (entities zaten sıralı)
+        for prev_entity in previous_utterance.entities:
+            # Bu entity şu anki cümlede var mı?
+            if prev_entity.text in current_entities_text:
+                # İlk bulunan = en yüksek öncelikli realize olmuş entity
+                for curr_entity in current_utterance.entities:
+                    if curr_entity.text == prev_entity.text:
+                        return curr_entity
+        
+        # Örtük özne (pro-drop): Özne yoksa ama önceki Cf'de özne varsa
         has_subject = any(e.grammatical_role == 'SUBJ' for e in current_utterance.entities)
-        if not has_subject and previous_utterance.cp.grammatical_role == 'SUBJ':
-            return Entity(previous_utterance.cp.text, 'SUBJ', previous_utterance.cp.case_marker)
+        if not has_subject:
+            # Önceki Cf'deki ilk özneyi bul (en yüksek öncelikli)
+            for prev_entity in previous_utterance.entities:
+                if prev_entity.grammatical_role == 'SUBJ':
+                    return Entity(prev_entity.text, 'SUBJ', prev_entity.case_marker)
         
         return None
     
