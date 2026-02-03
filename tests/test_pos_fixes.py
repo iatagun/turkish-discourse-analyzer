@@ -17,8 +17,10 @@ Test Edilen Durumlar:
 
 import os
 import sys
+import json
 import unittest
 from pathlib import Path
+from typing import Dict, Any, List
 
 # PyTorch 2.6 uyumluluk
 os.environ['TORCH_FORCE_WEIGHTS_ONLY_LOAD'] = '0'
@@ -28,6 +30,16 @@ parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
 
 from api.pos_semantic_analyzer import analyze_text
+
+
+# Test sonuçlarını JSON formatında toplamak için
+TEST_RESULTS = {
+    "test_suite": "POS Fixes Validation",
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 0,
+    "test_cases": []
+}
 
 
 class TestDIKSuffixFix(unittest.TestCase):
@@ -285,6 +297,29 @@ def run_tests():
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     
+    # Test özeti
+    TEST_RESULTS["total_tests"] = result.testsRun
+    TEST_RESULTS["passed"] = result.testsRun - len(result.failures) - len(result.errors)
+    TEST_RESULTS["failed"] = len(result.failures) + len(result.errors)
+    
+    # Örnek cümleler ve analizleri ekle
+    example_analyses = [
+        ("Ali'nin okuduğu kitap burada.", "DIK suffix detection"),
+        ("Kuşlar uçar.", "Generic analytic proposition"),
+        ("Kuşlar uçtu.", "Specific synthetic proposition"),
+        ("Ali sabahları erken kalkar.", "Habitual aspect"),
+        ("Yüzme havuzu temiz.", "Lexicalized compound filtering")
+    ]
+    
+    for text, description in example_analyses:
+        analysis = analyze_text(text)
+        TEST_RESULTS["test_cases"].append({
+            "description": description,
+            "input_text": text,
+            "stanza_output": analysis
+        })
+    
+    # Konsola özet yazdır
     print("\n" + "="*70)
     print("TEST ÖZET")
     print("="*70)
@@ -294,6 +329,14 @@ def run_tests():
     print(f"Hata: {len(result.errors)}")
     print(f"Başarı Oranı: {((result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun * 100):.1f}%")
     print("="*70)
+    
+    # JSON dosyasına kaydet
+    output_file = Path(__file__).parent / "test_results.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(TEST_RESULTS, f, indent=2, ensure_ascii=False)
+    
+    print(f"\n✅ Stanza JSON formatında test sonuçları: {output_file}")
+    print(f"   {len(TEST_RESULTS['test_cases'])} örnek cümle analizi içeriyor")
     
     return result.wasSuccessful()
 

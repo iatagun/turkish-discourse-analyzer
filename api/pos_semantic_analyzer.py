@@ -241,6 +241,15 @@ def analyze_text(text: str, include_semantics: bool = True) -> Dict[str, Any]:
                             "is_finite": bool
                         }
                     ],
+                    "preferences": [
+                        {
+                            "word": str,
+                            "stanza_pos": str,
+                            "suggested_pos": str,
+                            "confidence": float,
+                            "reason": str
+                        }
+                    ] | null,
                     "semantics": {...} | null
                 }
             ]
@@ -316,10 +325,23 @@ def analyze_text(text: str, include_semantics: bool = True) -> Dict[str, Any]:
         for word_data in words:
             word_data["preference"] = preference_map.get(word_data["text"])
         
+        # Sentence-level preferences summary (Stanza'nın eksik etiketledikleri)
+        preferences_summary = []
+        for word_data in words:
+            if word_data["preference"]:
+                preferences_summary.append({
+                    "word": word_data["text"],
+                    "stanza_pos": word_data["upos"],
+                    "suggested_pos": word_data["preference"]["expected_pos"],
+                    "confidence": word_data["preference"]["confidence"],
+                    "reason": word_data["preference"]["reason"]
+                })
+        
         # Sentence-level semantics
         sentence_data = {
             "text": sent.text,
             "words": words,
+            "preferences": preferences_summary if preferences_summary else None,
             "semantics": None
         }
         
@@ -405,21 +427,59 @@ if __name__ == "__main__":
         "Kuşlar uçar.",
         "Kuşlar uçtu.",
         "Ali sabahları erken kalkar.",
-        "Yüzme havuzu temiz."
+        "Yüzme havuzu temiz.",
+        "Yazma defteri aldım."
     ]
     
     print("=" * 80)
-    print("STRUCTURED JSON OUTPUT TEST - Stanza Format + Extensions")
+    print("TURKISH POS & SEMANTIC ANALYZER - Test Output")
+    print("=" * 80)
+    
+    # Preferences Summary Test
+    print("\n" + "=" * 80)
+    print("1. STANZA EKSIK ETIKETLEME TESPITİ - PREFERENCES SUMMARY")
     print("=" * 80)
     
     for sent in test_sentences:
+        result = analyze_text(sent)
+        
         print(f"\n📝 {sent}")
         print("-" * 80)
-        result = analyze_text(sent)
-        print(json.dumps(result, indent=2, ensure_ascii=False))
+        
+        preferences = result["sentences"][0]["preferences"]
+        
+        if preferences:
+            print("✅ Stanza'nın eksik etiketledikleri:")
+            for pref in preferences:
+                print(f"\n  Kelime: {pref['word']}")
+                print(f"  Stanza POS: {pref['stanza_pos']}")
+                print(f"  Önerilen POS: {pref['suggested_pos']}")
+                print(f"  Güven: {pref['confidence']:.0%}")
+                print(f"  Sebep: {pref['reason']}")
+        else:
+            print("✅ Preference yok (Stanza doğru etiketlemiş)")
+        
+        # Semantics özeti
+        sem = result["sentences"][0]["semantics"]
+        if sem:
+            print(f"\n  📊 Semantics: {sem['proposition_type']} / {sem['predicate_type']}")
+            if sem['generic_encoding']:
+                print(f"     Generic encoding, verifiability: {sem['verifiability']}")
     
+    # JSON Format Sample
     print("\n" + "=" * 80)
-    print("CONLL-U FORMAT SAMPLE")
+    print("2. STRUCTURED JSON OUTPUT - Stanza Format + Extensions")
+    print("=" * 80)
+    
+    sample_text = "Ali'nin okuduğu kitap burada."
+    print(f"\n📝 {sample_text}")
+    print("-" * 80)
+    result = analyze_text(sample_text)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    
+    # CONLL-U Format Sample
+    print("\n" + "=" * 80)
+    print("3. CONLL-U FORMAT SAMPLE")
     print("=" * 80)
     
     print(f"\n{analyze_to_conllu('Ali sabahları erken kalkar.')}")

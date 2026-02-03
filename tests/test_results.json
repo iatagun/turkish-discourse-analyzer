@@ -1,0 +1,420 @@
+{
+  "test_suite": "POS Fixes Validation",
+  "total_tests": 17,
+  "passed": 17,
+  "failed": 0,
+  "test_cases": [
+    {
+      "description": "DIK suffix detection",
+      "input_text": "Ali'nin okuduğu kitap burada.",
+      "stanza_output": {
+        "text": "Ali'nin okuduğu kitap burada.",
+        "sentences": [
+          {
+            "text": "Ali'nin okuduğu kitap burada.",
+            "words": [
+              {
+                "id": 1,
+                "text": "Ali'nin",
+                "lemma": "Ali",
+                "upos": "PROPN",
+                "xpos": "Prop",
+                "feats": "Case=Gen|Number=Sing|Person=3",
+                "head": 2,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 2,
+                "text": "okuduğu",
+                "lemma": "oku",
+                "upos": "VERB",
+                "xpos": "Verb",
+                "feats": "Aspect=Perf|Mood=Ind|Number[psor]=Sing|Person[psor]=3|Polarity=Pos|Tense=Past|VerbForm=Part",
+                "head": 3,
+                "deprel": "acl",
+                "misc": null,
+                "morphology": [
+                  "-DIK"
+                ],
+                "is_finite": false,
+                "preference": {
+                  "type": "NOUN ↔ VERB",
+                  "expected_pos": "NOUN",
+                  "confidence": 0.9,
+                  "reason": "Nominal suffix detected: ['-DIK']"
+                }
+              },
+              {
+                "id": 3,
+                "text": "kitap",
+                "lemma": "kitap",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Nom|Number=Sing|Person=3",
+                "head": 4,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 4,
+                "text": "burada",
+                "lemma": "bura",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Loc|Number=Sing|Person=3",
+                "head": 0,
+                "deprel": "root",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 5,
+                "text": ".",
+                "lemma": ".",
+                "upos": "PUNCT",
+                "xpos": "Punc",
+                "feats": null,
+                "head": 4,
+                "deprel": "punct",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              }
+            ],
+            "preferences": [
+              {
+                "word": "okuduğu",
+                "stanza_pos": "VERB",
+                "suggested_pos": "NOUN",
+                "confidence": 0.9,
+                "reason": "Nominal suffix detected: ['-DIK']"
+              }
+            ],
+            "semantics": {
+              "proposition_type": "synthetic",
+              "predicate_type": "holistic",
+              "generic_encoding": false,
+              "time_bound": false,
+              "verifiability": 0.7,
+              "clause_finiteness": "non-finite"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Generic analytic proposition",
+      "input_text": "Kuşlar uçar.",
+      "stanza_output": {
+        "text": "Kuşlar uçar.",
+        "sentences": [
+          {
+            "text": "Kuşlar uçar.",
+            "words": [
+              {
+                "id": 1,
+                "text": "Kuşlar",
+                "lemma": "kuş",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Nom|Number=Plur|Person=3",
+                "head": 2,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 2,
+                "text": "uçar",
+                "lemma": "uç",
+                "upos": "VERB",
+                "xpos": "Verb",
+                "feats": "Aspect=Hab|Mood=Ind|Number=Sing|Person=3|Polarity=Pos|Tense=Pres",
+                "head": 0,
+                "deprel": "root",
+                "misc": null,
+                "morphology": [],
+                "is_finite": true,
+                "preference": null
+              },
+              {
+                "id": 3,
+                "text": ".",
+                "lemma": ".",
+                "upos": "PUNCT",
+                "xpos": "Punc",
+                "feats": null,
+                "head": 2,
+                "deprel": "punct",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              }
+            ],
+            "preferences": null,
+            "semantics": {
+              "proposition_type": "analytic",
+              "predicate_type": "holistic",
+              "generic_encoding": true,
+              "time_bound": false,
+              "verifiability": 1.0,
+              "clause_finiteness": "finite"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Specific synthetic proposition",
+      "input_text": "Kuşlar uçtu.",
+      "stanza_output": {
+        "text": "Kuşlar uçtu.",
+        "sentences": [
+          {
+            "text": "Kuşlar uçtu.",
+            "words": [
+              {
+                "id": 1,
+                "text": "Kuşlar",
+                "lemma": "kuş",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Nom|Number=Plur|Person=3",
+                "head": 2,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 2,
+                "text": "uçtu",
+                "lemma": "uç",
+                "upos": "VERB",
+                "xpos": "Verb",
+                "feats": "Aspect=Perf|Mood=Ind|Number=Sing|Person=3|Polarity=Pos|Tense=Past",
+                "head": 0,
+                "deprel": "root",
+                "misc": null,
+                "morphology": [],
+                "is_finite": true,
+                "preference": null
+              },
+              {
+                "id": 3,
+                "text": ".",
+                "lemma": ".",
+                "upos": "PUNCT",
+                "xpos": "Punc",
+                "feats": null,
+                "head": 2,
+                "deprel": "punct",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              }
+            ],
+            "preferences": null,
+            "semantics": {
+              "proposition_type": "synthetic",
+              "predicate_type": "partitive",
+              "generic_encoding": false,
+              "time_bound": true,
+              "verifiability": 0.8,
+              "clause_finiteness": "finite"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Habitual aspect",
+      "input_text": "Ali sabahları erken kalkar.",
+      "stanza_output": {
+        "text": "Ali sabahları erken kalkar.",
+        "sentences": [
+          {
+            "text": "Ali sabahları erken kalkar.",
+            "words": [
+              {
+                "id": 1,
+                "text": "Ali",
+                "lemma": "Ali",
+                "upos": "PROPN",
+                "xpos": "Prop",
+                "feats": "Case=Nom|Number=Sing|Person=3",
+                "head": 4,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 2,
+                "text": "sabahları",
+                "lemma": "sabah",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Acc|Number=Plur|Person=3",
+                "head": 4,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 3,
+                "text": "erken",
+                "lemma": "erken",
+                "upos": "ADV",
+                "xpos": "Adverb",
+                "feats": null,
+                "head": 4,
+                "deprel": "advmod",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 4,
+                "text": "kalkar",
+                "lemma": "kalk",
+                "upos": "VERB",
+                "xpos": "Verb",
+                "feats": "Aspect=Hab|Mood=Ind|Number=Sing|Person=3|Polarity=Pos|Tense=Pres",
+                "head": 0,
+                "deprel": "root",
+                "misc": null,
+                "morphology": [],
+                "is_finite": true,
+                "preference": null
+              },
+              {
+                "id": 5,
+                "text": ".",
+                "lemma": ".",
+                "upos": "PUNCT",
+                "xpos": "Punc",
+                "feats": null,
+                "head": 4,
+                "deprel": "punct",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              }
+            ],
+            "preferences": null,
+            "semantics": {
+              "proposition_type": "synthetic",
+              "predicate_type": "habitual",
+              "generic_encoding": false,
+              "time_bound": false,
+              "verifiability": 0.8,
+              "clause_finiteness": "finite"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "Lexicalized compound filtering",
+      "input_text": "Yüzme havuzu temiz.",
+      "stanza_output": {
+        "text": "Yüzme havuzu temiz.",
+        "sentences": [
+          {
+            "text": "Yüzme havuzu temiz.",
+            "words": [
+              {
+                "id": 1,
+                "text": "Yüzme",
+                "lemma": "yüzme",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Nom|Number=Sing|Person=3",
+                "head": 2,
+                "deprel": "nmod:poss",
+                "misc": null,
+                "morphology": [
+                  "-mA"
+                ],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 2,
+                "text": "havuzu",
+                "lemma": "havuz",
+                "upos": "NOUN",
+                "xpos": "Noun",
+                "feats": "Case=Nom|Number=Sing|Number[psor]=Sing|Person=3|Person[psor]=3",
+                "head": 3,
+                "deprel": "nsubj",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 3,
+                "text": "temiz",
+                "lemma": "temiz",
+                "upos": "ADJ",
+                "xpos": "Adj",
+                "feats": null,
+                "head": 0,
+                "deprel": "root",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              },
+              {
+                "id": 4,
+                "text": ".",
+                "lemma": ".",
+                "upos": "PUNCT",
+                "xpos": "Punc",
+                "feats": null,
+                "head": 3,
+                "deprel": "punct",
+                "misc": null,
+                "morphology": [],
+                "is_finite": false,
+                "preference": null
+              }
+            ],
+            "preferences": null,
+            "semantics": {
+              "proposition_type": "synthetic",
+              "predicate_type": "holistic",
+              "generic_encoding": false,
+              "time_bound": false,
+              "verifiability": 0.7,
+              "clause_finiteness": "non-finite"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
