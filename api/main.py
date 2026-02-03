@@ -17,9 +17,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 # Parent directories'i path'e ekle
-sys.path.insert(0, str(Path(__file__).parent.parent / "error_detection"))
+parent_dir = Path(__file__).parent.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
 
-from minimalist_pos_error_detection import (
+from error_detection.minimalist_pos_error_detection import (  # type: ignore
     MinimalistPOSErrorDetector,
     create_lexical_item
 )
@@ -316,7 +318,7 @@ def check_sentence(text: str) -> Dict[str, Any]:
     
     # Parse edilmiş kelimeleri çıkar (FEATS dahil!)
     words = []
-    for sent in doc.sentences:
+    for sent in getattr(doc, 'sentences', []):
         for word in sent.words:
             words.append({
                 "text": word.text,
